@@ -37,11 +37,6 @@ create table if not exists vet_visits (
   created_at timestamp with time zone default now()
 );
 
--- No-login starter mode:
--- These policies allow the public anon key to read/write these tables.
--- Anyone who has your site URL and anon key could access the data.
--- This is okay for a simple private starter app, but add login later for stronger privacy.
-
 alter table daily_logs enable row level security;
 alter table weight_logs enable row level security;
 alter table vet_visits enable row level security;
