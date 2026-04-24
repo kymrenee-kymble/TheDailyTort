@@ -3,14 +3,21 @@
 }
 
 :root {
-  --ink: #1b1712;
-  --muted: #6a5f54;
-  --paper: #fff6e8;
-  --paper-light: #fffdf7;
-  --red: #9e2f1f;
-  --blue: #2f4a6d;
-  --orange: #c26a2e;
-  --rule: #2a2018;
+  --ink: #1c1712;
+  --muted: #6d6257;
+  --paper: #fff8ec;
+  --paper-deep: #f3e3ca;
+  --panel: #fffdf8;
+  --rule: #2b211b;
+
+  /* Image-inspired palette: controlled, not rainbow */
+  --red: #9f2f22;
+  --red-deep: #6f211a;
+  --green: #496c3d;
+  --green-soft: #e6efe1;
+  --orange: #c46d31;
+  --orange-soft: #f5dfc7;
+  --blue-black: #222d38;
 }
 
 body {
@@ -18,9 +25,9 @@ body {
   color: var(--ink);
   font-family: Georgia, "Times New Roman", serif;
   background:
-    radial-gradient(circle at 12% 0%, rgba(158, 47, 31, 0.12), transparent 28%),
-    radial-gradient(circle at 88% 4%, rgba(47, 74, 109, 0.10), transparent 30%),
-    repeating-linear-gradient(0deg, #fff6e8 0 38px, #f8ead1 38px 39px);
+    radial-gradient(circle at 12% 0%, rgba(159, 47, 34, 0.10), transparent 30%),
+    radial-gradient(circle at 88% 6%, rgba(73, 108, 61, 0.10), transparent 32%),
+    linear-gradient(180deg, var(--paper) 0%, #fffdf8 42%, var(--paper-deep) 100%);
 }
 
 main {
@@ -34,7 +41,8 @@ main {
   border-bottom: 4px solid var(--rule);
   padding: 18px 0 22px;
   margin-bottom: 16px;
-  background: rgba(255, 253, 247, 0.78);
+  background: rgba(255, 253, 248, 0.88);
+  box-shadow: 0 16px 40px rgba(43, 33, 27, 0.08);
 }
 
 .paper-date {
@@ -46,6 +54,7 @@ main {
   border-bottom: 1px solid var(--rule);
   padding-bottom: 10px;
   margin-bottom: 16px;
+  color: var(--muted);
 }
 
 .masthead-row {
@@ -61,8 +70,8 @@ main {
   align-items: center;
   justify-content: center;
   background:
-    radial-gradient(circle, rgba(194, 106, 46, 0.25), transparent 60%),
-    linear-gradient(135deg, rgba(47, 74, 109, 0.15), rgba(158, 47, 31, 0.12));
+    radial-gradient(circle, rgba(196, 109, 49, 0.28), transparent 60%),
+    linear-gradient(135deg, rgba(73, 108, 61, 0.18), rgba(159, 47, 34, 0.14));
   border: 2px solid var(--rule);
 }
 
@@ -79,7 +88,7 @@ main {
   letter-spacing: 0.25em;
   text-transform: uppercase;
   font-weight: 900;
-  color: var(--blue);
+  color: var(--green);
 }
 
 h1 {
@@ -97,10 +106,12 @@ h1 {
   margin: 8px 0 0;
   font-style: italic;
   font-size: 22px;
+  color: var(--blue-black);
 }
 
 .status {
   border: 2px solid var(--rule);
+  border-left: 8px solid var(--orange);
   background: #fff7e7;
   padding: 12px 14px;
   margin: 14px 0;
@@ -131,7 +142,7 @@ button {
   border: 2px solid var(--rule);
   border-radius: 0;
   padding: 11px 14px;
-  background: var(--rule);
+  background: var(--blue-black);
   color: #fffaf0;
   font-family: Arial, sans-serif;
   font-weight: 900;
@@ -142,10 +153,19 @@ button {
   cursor: pointer;
 }
 
+button:hover {
+  background: var(--red-deep);
+}
+
 button.secondary,
 button.tab {
-  background: var(--paper-light);
+  background: var(--panel);
   color: var(--ink);
+}
+
+button.secondary:hover,
+button.tab:hover {
+  background: var(--orange-soft);
 }
 
 button.tab.active {
@@ -164,14 +184,14 @@ button.wide {
   border-top: 3px solid var(--rule);
   border-bottom: 3px solid var(--rule);
   margin-bottom: 18px;
-  background: rgba(255, 253, 247, 0.85);
+  background: rgba(255, 253, 248, 0.88);
 }
 
 .headline-grid article {
   padding: 14px;
   border-right: 1px solid var(--rule);
   min-width: 0;
-  border-top: 5px solid transparent;
+  border-top: 5px solid var(--green);
 }
 
 .headline-grid article:last-child {
@@ -186,12 +206,14 @@ button.wide {
   border-top-color: var(--red) !important;
 }
 
-.tile-orange {
+.tile-orange,
+.tile-gold {
   border-top-color: var(--orange) !important;
 }
 
+.tile-green,
 .tile-blue {
-  border-top-color: var(--blue) !important;
+  border-top-color: var(--green) !important;
 }
 
 .tile-red svg,
@@ -200,13 +222,17 @@ button.wide {
 }
 
 .tile-orange svg,
-.tile-orange strong {
+.tile-orange strong,
+.tile-gold svg,
+.tile-gold strong {
   color: var(--orange);
 }
 
+.tile-green svg,
+.tile-green strong,
 .tile-blue svg,
 .tile-blue strong {
-  color: var(--blue);
+  color: var(--green);
 }
 
 .headline-grid span {
@@ -234,16 +260,17 @@ button.wide {
 
 .panel {
   border: 2px solid var(--rule);
-  border-top: 5px solid var(--red);
-  background: rgba(255, 253, 247, 0.95);
+  border-top: 6px solid var(--red);
+  background: rgba(255, 253, 248, 0.95);
   padding: 20px;
   margin-bottom: 18px;
   min-width: 0;
+  box-shadow: 0 12px 30px rgba(43, 33, 27, 0.06);
 }
 
 .panel.accent-blue,
 .sidebar .panel:nth-child(2) {
-  border-top-color: var(--blue);
+  border-top-color: var(--green);
 }
 
 .main-story h2,
@@ -254,6 +281,7 @@ button.wide {
   text-transform: uppercase;
   border-bottom: 3px solid var(--rule);
   padding-bottom: 10px;
+  color: var(--blue-black);
 }
 
 h3 {
@@ -262,11 +290,11 @@ h3 {
   text-transform: uppercase;
   font-family: Arial, sans-serif;
   letter-spacing: 0.08em;
-  color: var(--blue);
+  color: var(--green);
 }
 
 .form-section {
-  border-bottom: 1px solid rgba(48,39,31,0.3);
+  border-bottom: 1px solid rgba(43, 33, 27, 0.28);
   padding: 14px 0;
 }
 
@@ -293,6 +321,11 @@ textarea {
   font: 16px Arial, sans-serif;
   margin-top: 8px;
   background: #fffefa;
+}
+
+input:focus,
+textarea:focus {
+  outline: 3px solid rgba(196, 109, 49, 0.24);
 }
 
 input:disabled {
@@ -341,13 +374,15 @@ input[type="radio"] {
 }
 
 .food-card {
-  border-top: 4px solid var(--blue);
+  border-top: 5px solid var(--green);
 }
 
+.green-card,
 .blue-card {
-  border-top-color: var(--blue);
+  border-top-color: var(--green);
 }
 
+.gold-card,
 .orange-card {
   border-top-color: var(--orange);
 }
@@ -378,7 +413,7 @@ input[type="radio"] {
 
 .callout {
   border: 2px solid var(--rule);
-  background: var(--red);
+  background: linear-gradient(135deg, var(--red), var(--red-deep));
   color: white;
   padding: 12px;
   font-family: Arial, sans-serif;
@@ -464,7 +499,7 @@ input[type="radio"] {
 
 .chips span {
   border: 1px solid var(--rule);
-  background: #f4e6cf;
+  background: var(--green-soft);
   padding: 6px 8px;
   font-family: Arial, sans-serif;
   font-size: 13px;
