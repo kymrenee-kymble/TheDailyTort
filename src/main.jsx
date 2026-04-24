@@ -10,16 +10,16 @@ import {
   Bell,
   ShieldCheck,
   Bone,
-  ClipboardList,
   Home,
   History,
   Utensils,
-  Droplets,
   Leaf,
   Apple,
   Carrot,
+  RefreshCw,
 } from 'lucide-react';
 import { supabase, hasSupabaseConfig } from './supabaseClient';
+import raphaelImage from './assets/raphael-tort.png';
 import './styles.css';
 
 const todayIso = () => new Date().toISOString().slice(0, 10);
@@ -65,18 +65,29 @@ function blankDailyLog(dateString) {
   };
 }
 
-function asCsvValue(value) {
-  return `"${String(value ?? '').replaceAll('"', '""')}"`;
+function cleanDailyPayload(daily, date) {
+  return {
+    care_date: date,
+    soak_status: daily.soak_status || 'not logged',
+    humidifier_refilled: Boolean(daily.humidifier_refilled),
+    calcium_given: Boolean(daily.calcium_given),
+    greens_fed: Boolean(daily.greens_fed),
+    greens_text: daily.greens_text || '',
+    fruit_fed: Boolean(daily.fruit_fed),
+    fruit_text: daily.fruit_text || '',
+    veggie_fed: Boolean(daily.veggie_fed),
+    veggie_text: daily.veggie_text || '',
+    protein_fed: Boolean(daily.protein_fed),
+    protein_text: daily.protein_text || '',
+    outside_time: Boolean(daily.outside_time),
+    outside_duration: daily.outside_duration || '',
+    care_notes: daily.care_notes || '',
+    updated_at: new Date().toISOString(),
+  };
 }
 
-function reminderDueText() {
-  return [
-    { date: 'Every day', item: 'Feed Raphael' },
-    { date: 'Every 30 days', item: 'Weigh Raphael' },
-    { date: 'Every 30 days', item: 'Replace cuttlefish bone' },
-    { date: 'Jul 1 yearly', item: 'Change substrate' },
-    { date: 'Dec 1 yearly', item: 'Change substrate' },
-  ];
+function asCsvValue(value) {
+  return `"${String(value ?? '').replaceAll('"', '""')}"`;
 }
 
 function App() {
@@ -85,6 +96,7 @@ function App() {
   const [daily, setDaily] = useState(blankDailyLog(todayIso()));
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState('');
+  const [debug, setDebug] = useState('');
   const [vetChecked, setVetChecked] = useState(false);
   const [vetNotes, setVetNotes] = useState('');
   const [weightValue, setWeightValue] = useState('');
@@ -106,51 +118,70 @@ function App() {
     loadAllLogs();
   }, [date]);
 
-  async function safeQuery(action, fallbackMessage) {
+  async function runQuery(label, fn) {
+    if (!supabase) {
+      const msg = 'Supabase client is missing. Check Netlify environment variables.';
+      setStatus(msg);
+      setDebug(msg);
+      return { data: null, error: { message: msg } };
+    }
+
     try {
-      return await action();
+      const result = await fn();
+      if (result?.error) {
+        const msg = `${label}: ${result.error.message || JSON.stringify(result.error)}`;
+        setStatus(msg);
+        setDebug(msg);
+      }
+      return result;
     } catch (error) {
-      setStatus(`${fallbackMessage}: ${error.message}. Check Netlify environment variables, then trigger “Clear cache and deploy site.”`);
+      const msg = `${label}: ${error.message || String(error)}`;
+      setStatus(msg);
+      setDebug(msg);
       return { data: null, error };
     }
   }
 
+  async function testConnection() {
+    setStatus('Testing Supabase connection...');
+    const result = await runQuery('Connection test failed', () =>
+      supabase.from('daily_logs').select('care_date').limit(1)
+    );
+    if (!result.error) {
+      setStatus('Connection test passed. Supabase is reachable.');
+      setDebug('Connection test passed.');
+    }
+  }
+
   async function loadDay(dateString) {
-    if (!supabase) return;
     setLoading(true);
-    setStatus('');
-    const { data, error } = await safeQuery(
-      () => supabase.from('daily_logs').select('*').eq('care_date', dateString).maybeSingle(),
-      'Could not load this day'
+    const { data, error } = await runQuery('Could not load this day', () =>
+      supabase.from('daily_logs').select('*').eq('care_date', dateString).maybeSingle()
     );
 
-    if (error && !String(error.message).includes('Load failed')) setStatus(`Could not load day: ${error.message}`);
-    setDaily(data || blankDailyLog(dateString));
-    setVetChecked(false);
-    setVetNotes('');
+    if (!error) {
+      setDaily(data || blankDailyLog(dateString));
+      setVetChecked(false);
+      setVetNotes('');
+    }
     setLoading(false);
   }
 
   async function loadAllLogs() {
-    if (!supabase) return;
-
-    const vetResult = await safeQuery(
-      () => supabase.from('vet_visits').select('*').order('visit_date', { ascending: false }).limit(50),
-      'Could not load vet visits'
+    const vetResult = await runQuery('Could not load vet visits', () =>
+      supabase.from('vet_visits').select('*').order('visit_date', { ascending: false }).limit(50)
     );
-    setVetVisits(vetResult.data || []);
+    if (!vetResult.error) setVetVisits(vetResult.data || []);
 
-    const weightResult = await safeQuery(
-      () => supabase.from('weight_logs').select('*').order('weigh_date', { ascending: false }).limit(50),
-      'Could not load weight logs'
+    const weightResult = await runQuery('Could not load weight logs', () =>
+      supabase.from('weight_logs').select('*').order('weigh_date', { ascending: false }).limit(50)
     );
-    setWeights(weightResult.data || []);
+    if (!weightResult.error) setWeights(weightResult.data || []);
 
-    const historyResult = await safeQuery(
-      () => supabase.from('daily_logs').select('*').order('care_date', { ascending: false }).limit(365),
-      'Could not load daily history'
+    const historyResult = await runQuery('Could not load daily history', () =>
+      supabase.from('daily_logs').select('*').order('care_date', { ascending: false }).limit(365)
     );
-    setHistory(historyResult.data || []);
+    if (!historyResult.error) setHistory(historyResult.data || []);
   }
 
   function updateDaily(field, value) {
@@ -158,34 +189,24 @@ function App() {
   }
 
   async function saveDaily() {
-    if (!supabase) {
-      setStatus('Supabase is not connected. Add your Netlify environment variables first.');
-      return;
-    }
-
     setLoading(true);
-    setStatus('');
+    setStatus('Saving daily care...');
+    setDebug('');
 
-    const payload = {
-      ...daily,
-      care_date: date,
-      updated_at: new Date().toISOString(),
-    };
+    const payload = cleanDailyPayload(daily, date);
 
-    const { error } = await safeQuery(
-      () => supabase.from('daily_logs').upsert(payload, { onConflict: 'care_date' }),
-      'Save failed'
+    const saveResult = await runQuery('Save failed', () =>
+      supabase.from('daily_logs').upsert(payload, { onConflict: 'care_date' }).select().single()
     );
 
-    if (error) {
+    if (saveResult.error) {
       setLoading(false);
       return;
     }
 
     if (vetChecked && vetNotes.trim()) {
-      const vetResult = await safeQuery(
-        () => supabase.from('vet_visits').insert({ visit_date: date, notes: vetNotes.trim() }),
-        'Daily saved, but vet visit failed'
+      const vetResult = await runQuery('Daily saved, but vet visit failed', () =>
+        supabase.from('vet_visits').insert({ visit_date: date, notes: vetNotes.trim() }).select().single()
       );
       if (!vetResult.error) {
         setVetChecked(false);
@@ -194,7 +215,9 @@ function App() {
     }
 
     await loadAllLogs();
-    setStatus('Daily care saved.');
+    setDaily(saveResult.data || payload);
+    setStatus(`Saved ${niceDate(date)} successfully.`);
+    setDebug(`Saved row id: ${saveResult.data?.id || 'unknown'}`);
     setLoading(false);
   }
 
@@ -204,13 +227,12 @@ function App() {
       return;
     }
 
-    const { error } = await safeQuery(
-      () => supabase.from('weight_logs').insert({
+    const { error } = await runQuery('Weight save failed', () =>
+      supabase.from('weight_logs').insert({
         weigh_date: date,
         weight_value: weightValue.trim(),
         notes: weightNotes.trim(),
-      }),
-      'Weight save failed'
+      }).select().single()
     );
 
     if (!error) {
@@ -222,17 +244,10 @@ function App() {
   }
 
   async function exportCsv(range = true) {
-    if (!supabase) {
-      setStatus('Supabase is not connected, so export cannot run yet.');
-      return;
-    }
-
     let query = supabase.from('daily_logs').select('*').order('care_date', { ascending: true });
-    if (range) {
-      query = query.gte('care_date', exportStart).lte('care_date', exportEnd);
-    }
+    if (range) query = query.gte('care_date', exportStart).lte('care_date', exportEnd);
 
-    const { data, error } = await safeQuery(() => query, 'Export failed');
+    const { data, error } = await runQuery('Export failed', () => query);
     if (error) return;
 
     const headers = [
@@ -279,138 +294,152 @@ function App() {
 
   return (
     <main>
-      <section className="hero">
-        <div className="hero-art">
-          <img src="/raphael-tort.png" alt="Raphael the tortoise wearing sunglasses" />
-        </div>
-        <div className="hero-copy">
-          <p className="eyebrow">Raphael's Care Tracker</p>
-          <h1>The Daily Tort</h1>
-          <p className="hero-text">
-            Daily care, food rotation, sunshine, weight, vet notes, reminders, and pet-sitter exports for Tort.
-          </p>
-          <div className="hero-buttons">
-            <button onClick={saveDaily}><Save size={18} /> Save Today</button>
-            <button className="secondary" onClick={() => exportCsv(false)}><Download size={18} /> Export All</button>
+      <header className="masthead">
+        <div className="paper-date">{niceDate(date)} • Raphael Edition • Care Ledger</div>
+        <div className="masthead-row">
+          <div className="tort-badge">
+            <img src={raphaelImage} alt="Raphael the tortoise wearing sunglasses" />
+          </div>
+          <div>
+            <p className="eyebrow">Raphael's Care Tracker</p>
+            <h1>The Daily Tort</h1>
+            <p className="tagline">All the care that’s fit to log.</p>
           </div>
         </div>
-      </section>
+      </header>
 
-      {status && <div className="status">{status}</div>}
+      {status && (
+        <div className="status">
+          <strong>{status}</strong>
+          {debug && <small>{debug}</small>}
+        </div>
+      )}
 
       <nav className="tabs">
         <button className={activeTab === 'today' ? 'tab active' : 'tab'} onClick={() => setActiveTab('today')}><Home size={18} /> Today</button>
         <button className={activeTab === 'history' ? 'tab active' : 'tab'} onClick={() => setActiveTab('history')}><History size={18} /> Daily History</button>
         <button className={activeTab === 'health' ? 'tab active' : 'tab'} onClick={() => setActiveTab('health')}><Stethoscope size={18} /> Health Logs</button>
         <button className={activeTab === 'export' ? 'tab active' : 'tab'} onClick={() => setActiveTab('export')}><Download size={18} /> Export</button>
+        <button className="tab" onClick={testConnection}><RefreshCw size={18} /> Test Save Connection</button>
       </nav>
 
       {activeTab === 'today' && (
         <>
-          <section className="grid cards">
-            <div className="card">
+          <section className="headline-grid">
+            <article>
               <CalendarDays />
               <span>Selected Date</span>
               <strong>{niceDate(date)}</strong>
               <input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
-            </div>
-            <div className="card warm">
+            </article>
+            <article>
               <Utensils />
               <span>Food Rotation</span>
               <strong>{plan.isFruitDay ? 'Fruit Day' : 'Veggie Day'}</strong>
-            </div>
-            <div className="card green">
+            </article>
+            <article>
               <Bone />
               <span>Cuttlefish Bone</span>
               <strong>Every 30 days</strong>
-            </div>
-            <div className="card red">
+            </article>
+            <article>
               <ShieldCheck />
               <span>Substrate</span>
               <strong>7/1 + 12/1 yearly</strong>
-            </div>
+            </article>
           </section>
 
           <section className="layout">
-            <div className="panel">
-              <h2>Today's Care Log</h2>
+            <div className="panel main-story">
+              <h2>Today’s Care Log</h2>
 
-              <div className="task-row">
-                <label>
-                  <input type="radio" name="soak" checked={daily.soak_status === 'complete'} onChange={() => updateDaily('soak_status', 'complete')} />
-                  Soak complete
-                </label>
-                <label>
-                  <input type="radio" name="soak" checked={daily.soak_status === 'missed'} onChange={() => updateDaily('soak_status', 'missed')} />
-                  Soak missed
-                </label>
-              </div>
-
-              <div className="check-grid">
-                <label><input type="checkbox" checked={daily.humidifier_refilled} onChange={(e) => updateDaily('humidifier_refilled', e.target.checked)} /> Humidifier refilled</label>
-                <label><input type="checkbox" checked={daily.outside_time} onChange={(e) => updateDaily('outside_time', e.target.checked)} /> Outside sunshine</label>
-              </div>
-
-              {daily.outside_time && (
-                <input value={daily.outside_duration || ''} onChange={(e) => updateDaily('outside_duration', e.target.value)} placeholder="Outside duration, e.g. 30 minutes" />
-              )}
-
-              <h3>Food Log</h3>
-              <div className="food-grid">
-                <div className="food-box">
-                  <label><input type="checkbox" checked={daily.greens_fed} onChange={(e) => updateDaily('greens_fed', e.target.checked)} /> <Leaf size={16} /> Greens fed</label>
-                  <input value={daily.greens_text || ''} onChange={(e) => updateDaily('greens_text', e.target.value)} placeholder="Kale, dandelion greens, romaine, etc." />
+              <div className="form-section">
+                <h3>Soak</h3>
+                <div className="radio-grid">
+                  <label>
+                    <input type="radio" name="soak" checked={daily.soak_status === 'complete'} onChange={() => updateDaily('soak_status', 'complete')} />
+                    Complete
+                  </label>
+                  <label>
+                    <input type="radio" name="soak" checked={daily.soak_status === 'missed'} onChange={() => updateDaily('soak_status', 'missed')} />
+                    Missed
+                  </label>
                 </div>
+              </div>
 
-                <div className="food-box">
-                  <label><input type="checkbox" checked={daily.calcium_given} onChange={(e) => updateDaily('calcium_given', e.target.checked)} /> <Bone size={16} /> Calcium given</label>
-                  <input value="Daily calcium" disabled />
+              <div className="form-section">
+                <h3>Habitat + Sunshine</h3>
+                <div className="check-grid">
+                  <label><input type="checkbox" checked={daily.humidifier_refilled} onChange={(e) => updateDaily('humidifier_refilled', e.target.checked)} /> Humidifier refilled</label>
+                  <label><input type="checkbox" checked={daily.outside_time} onChange={(e) => updateDaily('outside_time', e.target.checked)} /> Outside sunshine</label>
                 </div>
-
-                {plan.isFruitDay && (
-                  <div className="food-box">
-                    <label><input type="checkbox" checked={daily.fruit_fed} onChange={(e) => updateDaily('fruit_fed', e.target.checked)} /> <Apple size={16} /> Fruit fed</label>
-                    <input value={daily.fruit_text || ''} onChange={(e) => updateDaily('fruit_text', e.target.value)} placeholder="Papaya, mango, berries, etc." />
-                  </div>
-                )}
-
-                {plan.isVeggieDay && (
-                  <div className="food-box">
-                    <label><input type="checkbox" checked={daily.veggie_fed} onChange={(e) => updateDaily('veggie_fed', e.target.checked)} /> <Carrot size={16} /> Veggie fed</label>
-                    <input value={daily.veggie_text || ''} onChange={(e) => updateDaily('veggie_text', e.target.value)} placeholder="Squash, mushroom, carrot, etc." />
-                  </div>
-                )}
-
-                {plan.isSunday && (
-                  <div className="food-box span-2">
-                    <label><input type="checkbox" checked={daily.protein_fed} onChange={(e) => updateDaily('protein_fed', e.target.checked)} /> Protein fed</label>
-                    <input value={daily.protein_text || ''} onChange={(e) => updateDaily('protein_text', e.target.value)} placeholder="Crickets, protein item, etc." />
-                  </div>
+                {daily.outside_time && (
+                  <input value={daily.outside_duration || ''} onChange={(e) => updateDaily('outside_duration', e.target.value)} placeholder="Outside duration, e.g. 30 minutes" />
                 )}
               </div>
 
-              <h3>Vet Visit</h3>
-              <div className="vet-box">
-                <label>
-                  <input type="checkbox" checked={vetChecked} onChange={(e) => setVetChecked(e.target.checked)} />
-                  Vet visit today
-                </label>
-                {vetChecked && (
-                  <textarea value={vetNotes} onChange={(e) => setVetNotes(e.target.value)} placeholder="Vet visit notes..." />
-                )}
+              <div className="form-section">
+                <h3>Food Log</h3>
+                <div className="food-grid">
+                  <div className="food-card">
+                    <label><input type="checkbox" checked={daily.greens_fed} onChange={(e) => updateDaily('greens_fed', e.target.checked)} /> <Leaf size={16} /> Greens fed</label>
+                    <input value={daily.greens_text || ''} onChange={(e) => updateDaily('greens_text', e.target.value)} placeholder="Kale, dandelion greens, romaine, etc." />
+                  </div>
+
+                  <div className="food-card">
+                    <label><input type="checkbox" checked={daily.calcium_given} onChange={(e) => updateDaily('calcium_given', e.target.checked)} /> <Bone size={16} /> Calcium given</label>
+                    <input value="Daily calcium" disabled />
+                  </div>
+
+                  {plan.isFruitDay && (
+                    <div className="food-card">
+                      <label><input type="checkbox" checked={daily.fruit_fed} onChange={(e) => updateDaily('fruit_fed', e.target.checked)} /> <Apple size={16} /> Fruit fed</label>
+                      <input value={daily.fruit_text || ''} onChange={(e) => updateDaily('fruit_text', e.target.value)} placeholder="Papaya, mango, berries, etc." />
+                    </div>
+                  )}
+
+                  {plan.isVeggieDay && (
+                    <div className="food-card">
+                      <label><input type="checkbox" checked={daily.veggie_fed} onChange={(e) => updateDaily('veggie_fed', e.target.checked)} /> <Carrot size={16} /> Veggie fed</label>
+                      <input value={daily.veggie_text || ''} onChange={(e) => updateDaily('veggie_text', e.target.value)} placeholder="Squash, mushroom, carrot, etc." />
+                    </div>
+                  )}
+
+                  {plan.isSunday && (
+                    <div className="food-card full">
+                      <label><input type="checkbox" checked={daily.protein_fed} onChange={(e) => updateDaily('protein_fed', e.target.checked)} /> Protein fed</label>
+                      <input value={daily.protein_text || ''} onChange={(e) => updateDaily('protein_text', e.target.value)} placeholder="Crickets, protein item, etc." />
+                    </div>
+                  )}
+                </div>
               </div>
 
-              <h3>Care Notes</h3>
-              <textarea value={daily.care_notes || ''} onChange={(e) => updateDaily('care_notes', e.target.value)} placeholder="General care notes..." />
+              <div className="form-section">
+                <h3>Vet Visit</h3>
+                <div className="vet-box">
+                  <label className="single-line">
+                    <input type="checkbox" checked={vetChecked} onChange={(e) => setVetChecked(e.target.checked)} />
+                    Vet visit today
+                  </label>
+                  {vetChecked && (
+                    <textarea value={vetNotes} onChange={(e) => setVetNotes(e.target.value)} placeholder="Vet visit notes..." />
+                  )}
+                </div>
+              </div>
+
+              <div className="form-section">
+                <h3>Care Notes</h3>
+                <textarea value={daily.care_notes || ''} onChange={(e) => updateDaily('care_notes', e.target.value)} placeholder="General care notes..." />
+              </div>
 
               <button className="wide" onClick={saveDaily} disabled={loading}>
                 <Save size={18} /> {loading ? 'Saving...' : 'Save Daily Care'}
               </button>
             </div>
 
-            <aside className="side">
+            <aside className="sidebar">
               <div className="panel reminder-panel">
-                <h2>Today's Reminder</h2>
+                <h2>Today’s Reminder</h2>
                 <p className="callout">{plan.isFruitDay ? 'Fruit Day' : 'Veggie Day'} for Raphael</p>
                 <ul className="reminders">
                   {reminderItems.map((item) => <li key={item}>{item}</li>)}
@@ -420,9 +449,9 @@ function App() {
               <div className="panel">
                 <h2>Upcoming</h2>
                 <div className="mini-log">
-                  {reminderDueText().map((item) => (
-                    <div key={`${item.date}-${item.item}`}><strong>{item.item}</strong><span>{item.date}</span></div>
-                  ))}
+                  <div><strong>Weigh Raphael</strong><span>Every 30 days</span></div>
+                  <div><strong>New cuttlefish bone</strong><span>Every 30 days</span></div>
+                  <div><strong>Change substrate</strong><span>July 1 + Dec 1 yearly</span></div>
                 </div>
               </div>
             </aside>
@@ -435,7 +464,7 @@ function App() {
           <div className="section-header">
             <div>
               <h2>Daily Log History</h2>
-              <p>All saved daily care records. Use Export for all history or a custom timeframe.</p>
+              <p>All saved daily care records. Export all history or a custom timeframe.</p>
             </div>
             <button className="secondary" onClick={() => exportCsv(false)}><Download size={18} /> Export All</button>
           </div>
