@@ -19,7 +19,6 @@ import {
   RefreshCw,
 } from 'lucide-react';
 import { supabase, hasSupabaseConfig } from './supabaseClient';
-import raphaelImage from './assets/raphael-tort.png';
 import './styles.css';
 
 const todayIso = () => new Date().toISOString().slice(0, 10);
@@ -298,7 +297,7 @@ function App() {
         <div className="paper-date">{niceDate(date)} • Raphael Edition • Care Ledger</div>
         <div className="masthead-row">
           <div className="tort-badge">
-            <img src={raphaelImage} alt="Raphael the tortoise wearing sunglasses" />
+            <img src="/raphael-tort.png" alt="Raphael the tortoise wearing sunglasses" />
           </div>
           <div>
             <p className="eyebrow">Raphael's Care Tracker</p>
